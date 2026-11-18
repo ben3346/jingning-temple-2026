@@ -91,6 +91,10 @@ button:hover{filter:brightness(1.06)}
 @media(min-width:700px){.templeJoystick{width:145px;height:145px;left:32px;bottom:32px}.templeActions{right:32px;bottom:35px}}
 #reenterTempleBtn{display:none;position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:90;border:1px solid #e5bd67;border-radius:999px;padding:13px 18px;background:linear-gradient(#fff0c8,#e6b85d);color:#572017;font-weight:800;box-shadow:0 5px 18px #0006} #reenterTempleBtn.show{display:block}
 </style>
+<style>
+#templeChat input:focus{outline:2px solid #e5bd67}
+@media(max-width:600px){#templeChat{top:calc(108px + env(safe-area-inset-top));right:8px;width:min(220px,52vw);max-height:34vh}#templeChatMessages{max-height:18vh!important;min-height:50px!important}#templeMultiplayerBadge{left:8px!important;top:calc(108px + env(safe-area-inset-top))!important;font-size:10px!important}}
+</style>
 </head>
 <body>
 
@@ -99,7 +103,10 @@ button:hover{filter:brightness(1.06)}
     <div class="entry-mark">🏮</div>
     <h1>地母至尊殿</h1>
     <p>殿門已開，恭迎善信<br>恭迎地母至尊慈悲安座。放慢腳步、靜心祈願，願平安與福氣常伴左右。</p>
-    <button class="enter-btn" onclick="enterTemple()">✨ 進入地母至尊殿 ✨</button>
+    <label for="templePlayerName" style="display:block;text-align:left;margin:14px auto 5px;max-width:300px;font-weight:700;color:#ffe7b2">請輸入入殿名稱</label>
+    <input id="templePlayerName" maxlength="12" autocomplete="nickname" placeholder="例如：平安善信" style="display:block;width:min(300px,85%);box-sizing:border-box;margin:0 auto 10px;padding:12px 14px;border:1px solid #d7aa55;border-radius:12px;background:#fffaf0;color:#542017;font-size:16px">
+    <div id="multiplayerStatus" style="font-size:12px;color:#ffe7b2;margin:6px 0 12px">多人連線初始化中……</div>
+    <button class="enter-btn" id="enterTempleButton" onclick="enterTemple()" disabled style="opacity:.65">連線準備中…</button>
   </div>
 </div>
 
@@ -112,6 +119,15 @@ button:hover{filter:brightness(1.06)}
  <div class="templeJoystick" id="templeJoystick"><div id="templeKnob"></div></div>
  <div class="templeActions"><button onclick="templeLightIncense()">🕯️<br>點香</button><button onclick="templeWorship()">🙏<br>參拜</button><button onclick="templeCastBlocks()">🥠<br>擲筊</button><button onclick="openLotModal()">🎋<br>抽籤</button><button onclick="templeReset()">↩<br>入口</button></div>
  <div class="templeNotice" id="templeNotice">正殿中央保持淨空，歡迎入殿參拜。</div>
+ <div id="templeMultiplayerBadge" style="position:absolute;top:calc(108px + env(safe-area-inset-top));left:12px;background:#2b0b09dd;color:#ffe6aa;border:1px solid #d7aa55;border-radius:14px;padding:7px 10px;font-size:12px;pointer-events:none">👥 連線中</div>
+ <section id="templeChat" aria-label="多人聊天室" style="position:absolute;right:12px;top:calc(108px + env(safe-area-inset-top));width:min(290px,42vw);max-height:42vh;display:flex;flex-direction:column;background:#210907dd;border:1px solid #d7aa55;border-radius:14px;overflow:hidden;color:#fff0c9;font:12px/1.4 system-ui;z-index:3">
+  <div style="padding:7px 9px;background:#542016;font-weight:700">💬 善信聊天室 <span id="templePlayerCount" style="float:right;font-weight:400">0 人</span></div>
+  <div id="templeChatMessages" aria-live="polite" style="padding:7px 9px;overflow:auto;min-height:72px;max-height:25vh;overflow-wrap:anywhere"></div>
+  <form id="templeChatForm" style="display:flex;gap:5px;padding:6px;background:#160605">
+   <input id="templeChatInput" maxlength="120" placeholder="輸入訊息…" autocomplete="off" style="min-width:0;flex:1;padding:8px;border-radius:8px;border:1px solid #a8793e;background:#fff8e9;color:#35120c;font-size:13px">
+   <button type="submit" style="border:0;border-radius:8px;padding:0 10px;background:#e4b65e;color:#45170d;font-weight:700">送出</button>
+  </form>
+ </section>
 </div>
 
 <div class="lot-modal" id="lotModal" role="dialog" aria-modal="true" aria-labelledby="lotTitle">
@@ -249,7 +265,12 @@ function quickEnterTempleAction(action){
   };
   window.setTimeout(run,350);
 }
-function enterTemple(){
+async function enterTemple(){
+  const nameInput=document.getElementById('templePlayerName');
+  const playerName=(nameInput?.value||'').trim().slice(0,12);
+  if(!playerName){if(nameInput){nameInput.focus();nameInput.style.borderColor='#e05a42';}const st=document.getElementById('multiplayerStatus');if(st)st.textContent='請先輸入入殿名稱。';return;}
+  const visitorInput=document.getElementById('visitor');if(visitorInput)visitorInput.value=playerName;
+  if(window.joinTempleMultiplayer){const joined=await window.joinTempleMultiplayer(playerName);if(!joined)return;}
   const gate=document.getElementById('entry'); gate.classList.add('hide');
   const reenter=document.getElementById('reenterTempleBtn'); if(reenter) reenter.classList.remove('show');
   document.querySelectorAll('.smoke').forEach(x=>x.classList.add('active')); goldSparkles();
@@ -260,6 +281,7 @@ function enterTemple(){
 function closeTempleExperience(){
   document.getElementById('templeExperience').classList.remove('active');
   if(window.stopTempleRoom) window.stopTempleRoom();
+  if(window.leaveTempleMultiplayer) window.leaveTempleMultiplayer();
   /* 離開殿內後回到原本外層網頁，不再用殿門畫面遮住網頁內容。 */
   const gate=document.getElementById('entry');
   if(gate) gate.classList.add('hide');
@@ -320,6 +342,9 @@ show=function(t){
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getDatabase, ref, set, update, push, onValue, onChildAdded, onDisconnect, remove, serverTimestamp, query, orderByChild, limitToLast } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 const canvas=document.getElementById('templeCanvas'),root=document.getElementById('templeExperience');
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x1c0906);scene.fog=new THREE.Fog(0x1c0906,19,42);
 const camera=new THREE.PerspectiveCamera(68,1,.1,100);camera.position.set(0,1.65,8.2);
@@ -648,6 +673,103 @@ const joy=document.getElementById('templeJoystick'),knob=document.getElementById
 function joyMove(e){const r=joy.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,max=r.width*.34,d=Math.hypot(dx,dy)||1,scale=Math.min(1,max/d);jx=dx*scale/max;jy=dy*scale/max;knob.style.left=`calc(50% + ${dx*scale}px)`;knob.style.top=`calc(50% + ${dy*scale}px)`;}
 joy.addEventListener('pointerdown',e=>{jid=e.pointerId;joy.setPointerCapture(jid);joyMove(e);});joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)joyMove(e);});function joyEnd(){jid=null;jx=jy=0;knob.style.left='50%';knob.style.top='50%';}joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
 function resize(){const w=root.clientWidth||innerWidth,h=root.clientHeight||innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}window.addEventListener('resize',resize);
+// ===== 靜寧宮多人連線：沿用原本攝影機座標，遠端善信以簡潔 3D 人物呈現 =====
+const firebaseConfig={
+ apiKey:'AIzaSyA93h5uW27U5Ez3oO8WijqQcwwqN_fA9QQ',
+ authDomain:'jingning-temple.firebaseapp.com',
+ databaseURL:'https://jingning-temple-default-rtdb.asia-southeast1.firebasedatabase.app',
+ projectId:'jingning-temple',
+ storageBucket:'jingning-temple.firebasestorage.app',
+ messagingSenderId:'1042142550713',
+ appId:'1:1042142550713:web:eaed49b888e372044a9968'
+};
+let multiplayerDb=null,multiplayerUid=null,multiplayerPlayerRef=null,multiplayerJoined=false;
+const remotePlayers=new Map();
+const statusEl=document.getElementById('multiplayerStatus');
+const setMpStatus=(msg)=>{if(statusEl)statusEl.textContent=msg;};
+function makeNameSprite(name){
+ const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d');
+ ctx.fillStyle='rgba(35,9,6,.88)';ctx.strokeStyle='#e5bd67';ctx.lineWidth=5;
+ const r=24;ctx.beginPath();ctx.roundRect(8,8,496,112,r);ctx.fill();ctx.stroke();
+ ctx.font='bold 48px system-ui,"Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff0c9';
+ let label=String(name||'善信').slice(0,12);ctx.fillText(label,256,65,455);
+ const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;
+ const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));sprite.scale.set(1.55,.39,1);sprite.position.y=2.05;return sprite;
+}
+function makeVisitorModel(color,name){
+ const group=new THREE.Group();const bodyMat=new THREE.MeshStandardMaterial({color:color||0x4b8fc7,roughness:.75});
+ const skin=new THREE.MeshStandardMaterial({color:0xf0c49b,roughness:.8});
+ const darkMat=new THREE.MeshStandardMaterial({color:0x29201b,roughness:.9});
+ const body=new THREE.Mesh(new THREE.CylinderGeometry(.22,.27,.72,12),bodyMat);body.position.y=.98;group.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.22,16,12),skin);head.position.y=1.52;group.add(head);
+ const hair=new THREE.Mesh(new THREE.SphereGeometry(.225,16,10,0,Math.PI*2,0,Math.PI*.55),darkMat);hair.position.y=1.58;group.add(hair);
+ for(const side of [-1,1]){
+  const arm=new THREE.Mesh(new THREE.CylinderGeometry(.075,.09,.53,10),bodyMat);arm.position.set(side*.29,1.02,0);arm.rotation.z=side*.18;group.add(arm);
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(.09,.105,.48,10),darkMat);leg.position.set(side*.12,.36,0);group.add(leg);
+ }
+ const feet=new THREE.Mesh(new THREE.BoxGeometry(.36,.12,.48),darkMat);feet.position.set(0,.1,.04);group.add(feet);
+ group.add(makeNameSprite(name));group.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return group;
+}
+function upsertRemotePlayer(uid,data){
+ if(!uid||uid===multiplayerUid)return;
+ if(!data||typeof data.x!=='number'||typeof data.z!=='number'){
+  const old=remotePlayers.get(uid);if(old){scene.remove(old.group);remotePlayers.delete(uid);}return;
+ }
+ let item=remotePlayers.get(uid);
+ if(!item){const group=makeVisitorModel(data.color,data.name);scene.add(group);item={group};remotePlayers.set(uid,item);}
+ item.group.position.set(THREE.MathUtils.clamp(data.x,-7.05,7.05),0,THREE.MathUtils.clamp(data.z,-12.5,10));
+ item.group.rotation.y=Number(data.yaw)||0;
+}
+function renderChatMessage(msg){
+ const box=document.getElementById('templeChatMessages');if(!box)return;
+ const row=document.createElement('div');row.style.margin='3px 0';
+ const who=document.createElement('strong');who.style.color='#f3c76c';who.textContent=(msg.name||'善信')+'：';
+ const body=document.createElement('span');body.textContent=String(msg.text||'').slice(0,120);
+ row.append(who,body);box.appendChild(row);
+ while(box.children.length>40)box.firstChild.remove();box.scrollTop=box.scrollHeight;
+}
+async function initMultiplayer(){
+ try{
+  const app=initializeApp(firebaseConfig);const auth=getAuth(app);multiplayerDb=getDatabase(app);
+  await signInAnonymously(auth);multiplayerUid=auth.currentUser.uid;
+  setMpStatus('✅ 多人服務已連線，請輸入名稱入殿。');
+  const playersRef=ref(multiplayerDb,'players');
+  onValue(playersRef,snap=>{
+   const data=snap.val()||{};for(const [uid,p] of Object.entries(data))upsertRemotePlayer(uid,p);
+   for(const [uid,item] of remotePlayers){if(!data[uid]){scene.remove(item.group);remotePlayers.delete(uid);}}
+   const count=Object.keys(data).length;const pc=document.getElementById('templePlayerCount');const badge=document.getElementById('templeMultiplayerBadge');
+   if(pc)pc.textContent=count+' 人';if(badge)badge.textContent='👥 '+count+' 位善信在線';
+  },err=>{console.error('players listener',err);});
+  const chatQuery=query(ref(multiplayerDb,'chat'),orderByChild('createdAt'),limitToLast(30));
+  onChildAdded(chatQuery,snap=>renderChatMessage(snap.val()||{}));
+  const form=document.getElementById('templeChatForm');
+  form?.addEventListener('submit',async e=>{
+   e.preventDefault();const input=document.getElementById('templeChatInput');const text=(input?.value||'').trim().slice(0,120);if(!text||!multiplayerJoined)return;
+   input.value='';try{await push(ref(multiplayerDb,'chat'),{uid:multiplayerUid,name:window.templePlayerName||'善信',text,createdAt:serverTimestamp()});}catch(err){console.error(err);setMpStatus('聊天室傳送失敗，請稍後再試。');}
+  });
+  window.joinTempleMultiplayer=async name=>{
+   if(!multiplayerDb||!multiplayerUid){setMpStatus('多人連線尚未完成，請稍候再試。');return false;}
+   window.templePlayerName=String(name).trim().slice(0,12)||'善信';multiplayerPlayerRef=ref(multiplayerDb,'players/'+multiplayerUid);
+   const color=0x000000|((Math.abs(hashName(multiplayerUid))&0xffffff));
+   try{
+    await set(multiplayerPlayerRef,{name:window.templePlayerName,color,x:camera.position.x,z:camera.position.z,yaw,joinedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    await onDisconnect(multiplayerPlayerRef).remove();multiplayerJoined=true;
+    setMpStatus('已加入多人宮殿。');return true;
+   }catch(err){console.error('join failed',err);setMpStatus('加入多人空間失敗：請確認 Firebase 資料庫規則已發布。');return false;}
+  };
+  const btn=document.getElementById('enterTempleButton');if(btn){btn.disabled=false;btn.style.opacity='1';btn.textContent='✨ 進入地母至尊殿 ✨';}
+  window.leaveTempleMultiplayer=async()=>{if(multiplayerPlayerRef){try{await remove(multiplayerPlayerRef);}catch(err){console.warn(err);}}multiplayerJoined=false;};
+ }catch(err){console.error('Firebase init failed',err);setMpStatus('多人服務連線失敗，請重新整理網頁；若持續發生，請檢查 Firebase 設定。');}
+}
+function hashName(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+initMultiplayer();
+let lastPresenceWrite=0;
+async function syncMyPosition(now){
+ if(!multiplayerJoined||!multiplayerPlayerRef||now-lastPresenceWrite<120)return;lastPresenceWrite=now;
+ try{await update(multiplayerPlayerRef,{x:camera.position.x,z:camera.position.z,yaw,updatedAt:Date.now()});}catch(err){console.warn('position sync',err);}
+}
+window.addEventListener('beforeunload',()=>{if(multiplayerPlayerRef)remove(multiplayerPlayerRef).catch(()=>{});});
+
 function loop(t){raf=requestAnimationFrame(loop);const dt=Math.min((t-last)/1000||0,.04);last=t;camera.rotation.order='YXZ';camera.rotation.set(pitch,yaw,0);let f=-jy+wheelMove,s=jx;wheelMove*=Math.max(0,1-dt*3.2);if(Math.abs(wheelMove)<.015)wheelMove=0;if(keys.has('w')||keys.has('arrowup'))f+=1;if(keys.has('s')||keys.has('arrowdown'))f-=1;if(keys.has('a')||keys.has('arrowleft'))s-=1;if(keys.has('d')||keys.has('arrowright'))s+=1;const n=Math.hypot(f,s)||1;if(n>1){f/=n;s/=n;}camera.position.x=Math.max(-7.05,Math.min(7.05,camera.position.x+Math.cos(yaw)*s*4*dt-Math.sin(yaw)*f*4*dt));camera.position.z=Math.max(-12.5,Math.min(10,camera.position.z+Math.sin(yaw)*s*4*dt-Math.cos(yaw)*f*4*dt));camera.position.y=1.65;
   const now=t*.001;
   updateJiaobei(dt);
@@ -674,6 +796,7 @@ function loop(t){raf=requestAnimationFrame(loop);const dt=Math.min((t-last)/1000
       if(typeof a.onComplete==='function')a.onComplete();
     }
   }
+  syncMyPosition(t);
   renderer.render(scene,camera);} 
 window.isNearTempleAltar=()=>Math.hypot(camera.position.x-censerX,camera.position.z-censerZ)<2.8;
 // 外頁快捷按鈕專用：把角色帶到香爐／擲筊台附近，再呼叫既有動畫或抽籤流程。
